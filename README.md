@@ -120,7 +120,7 @@ NR>1 {
 ```
  grep -c ">" stx2_unique.fasta
 ```
-875 sequences left, Meaning some isolates do have multiple stx2.
+875 sequences left. In the in-house dataset 838 isolates have stx2. So some of the isolates have more than 1 hits.
 
 ## Include stx2 A reference sequence
 ```
@@ -187,4 +187,43 @@ sed 's/\.contigs//g' stx2_analysis/stx2_annotated.fasta > stx2_analysis/stx2_fin
 ## Mafft Alignment
 ```
 mafft --auto stx2_analysis/stx2_final.fasta > stx2_analysis/stx2_aligned.fasta
+```
+
+## Seperate analysis for EHEC and STEC
+```
+awk '
+BEGIN {RS=">"; FS="\n"}
+NR>1 {
+    header=$1
+    if (header ~ /\|EHEC\|/) {
+        print ">" $0
+    }
+}
+' stx2_analysis/stx2_final.fasta > stx2_analysis/EHEC.fasta
+```
+
+```
+ awk '
+BEGIN {RS=">"; FS="\n"}
+NR>1 {
+    header=$1
+    if (header ~ /\|STEC\|/) {
+        print ">" $0
+    }
+}
+' stx2_analysis/stx2_final.fasta > stx2_analysis/STEC.fasta
+```
+🧬 ✅ STEP 2 — Add reference to BOTH groups
+
+Add reference
+```
+cat stx2A_ref.fasta stx2_analysis/EHEC.fasta > stx2_analysis/EHEC_with_ref.fasta
+cat stx2A_ref.fasta stx2_analysis/STEC.fasta > stx2_analysis/STEC_with_ref.fasta
+```
+🧬 ✅ STEP 3 — Re-align separately
+
+Using MAFFT:
+```
+mafft --auto stx2_analysis/EHEC_with_ref.fasta > stx2_analysis/EHEC_aligned.fasta
+mafft --auto stx2_analysis/STEC_with_ref.fasta > stx2_analysis/STEC_aligned.fasta
 ```
