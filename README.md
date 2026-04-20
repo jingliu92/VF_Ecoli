@@ -44,3 +44,4 @@ for f in /home/jing/E.coli_test/vf_out/*/results_tab.tsv; do
     echo -e "$sample\t$class\t${stx_types:-NA}\t$eae_status"
 done >> classification_with_subtype.tsv
 ```
+Among 1,353 E.coli, 247 of them are classified as STEC, and 847 of them are EHEC and 254 of them are others.
