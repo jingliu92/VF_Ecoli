@@ -1,5 +1,7 @@
-# VF_Ecoli
-## Find Virulence Genes in the whole dataset
+# Find Deletions in variable regions of stx2 A subunit
+The goal of current project is to find deletions of stx2 in subunit A in STECs in our in-house sequenced E. coli database (1,353 isolates). 
+
+## Use virulencefinder to find all the virulence genes in the whole dataset
 ```
 conda activate virulencefinder_env
 ```
@@ -10,8 +12,7 @@ for f in /home/jing/E.coli_test/ecoli_all/*.fasta; do
     sample=$(basename $f .fasta)
     echo "Running $sample..."
 
-    mkdir -p /home/jing/E.coli_test/vf_out/$sample   # 👈 ADD THIS
-
+    mkdir -p /home/jing/E.coli_test/vf_out/$sample 
     virulencefinder.py \
       -i $f \
       -o /home/jing/E.coli_test/vf_out/$sample \
@@ -19,6 +20,8 @@ for f in /home/jing/E.coli_test/ecoli_all/*.fasta; do
       -x
 done
 ```
+Note, 5 samples failed virulennce gene detection due to the short length of contigs. Left 1,348 isolates for downstream analysis.
+
 ## Classify EHEC/STECT/NA based on the resuls
 ```
 echo -e "Sample\tClass\tstx_subtype\teae" > classification_with_subtype.tsv
@@ -90,7 +93,7 @@ END {
 <img width="785" height="285" alt="image" src="https://github.com/user-attachments/assets/ed712348-5ede-4f89-8445-bb3dc02ff2e7" />
 
 
-## deduplicate by locus
+## Deduplicate by locus
 ```
 awk '
 BEGIN {RS=">"; FS="\n"}
@@ -120,7 +123,7 @@ NR>1 {
 ```
  grep -c ">" stx2_unique.fasta
 ```
-875 sequences left. In the in-house dataset 838 isolates have stx2. So some of the isolates have more than 1 hits.
+875 sequences left. * In the in-house dataset 838 isolates have stx2 *. So some of the isolates have more than 1 hits.
 
 ## Include stx2 A reference sequence
 ```
@@ -183,12 +186,6 @@ FNR==1 {
 ```
 sed 's/\.contigs//g' stx2_analysis/stx2_annotated.fasta > stx2_analysis/stx2_final.fasta
 ```
-
-## Mafft Alignment
-```
-mafft --auto stx2_analysis/stx2_final.fasta > stx2_analysis/stx2_aligned.fasta
-```
-
 ## Seperate analysis for EHEC and STEC
 ```
 awk '
@@ -227,3 +224,10 @@ Using MAFFT:
 mafft --auto stx2_analysis/EHEC_with_ref.fasta > stx2_analysis/EHEC_aligned.fasta
 mafft --auto stx2_analysis/STEC_with_ref.fasta > stx2_analysis/STEC_aligned.fasta
 ```
+
+
+## Mafft Alignment for both STEC and EHEC
+```
+mafft --auto stx2_analysis/stx2_final.fasta > stx2_analysis/stx2_aligned.fasta
+```
+
