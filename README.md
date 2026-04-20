@@ -48,7 +48,17 @@ for f in /home/jing/E.coli_test/vf_out/*/results_tab.tsv; do
 done >> classification_with_subtype.tsv
 ```
 Among 1,353 E.coli, 247 of them are classified as STEC, and 847 of them are EHEC and 254 of them are others.
-Moving forward, we will extract stx2 from both EHEC and STEC sequences.
+```
+awk '$3 ~ /stx2/' classification_with_subtype.tsv | wc -l
+```
+838 isolates have stx2. Moving forward, we will extract stx2 from both EHEC and STEC sequences.
+
+```
+ awk 'NR>1 && $3 ~ /stx2/ {count[$2]++} END {for (c in count) print c, count[c]}' classification_with_subtype.tsv
+```
+
+STEC 231
+EHEC 607
 
 ## Extract STEC + EHEC:
 ```
