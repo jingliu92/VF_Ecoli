@@ -86,31 +86,121 @@ END {
 }
 ' stx2_analysis/stx2_all.fasta > stx2_analysis/stx2_filtered.fasta
 ```
-No change. Meaning all stx2 genes extract are larger than 300bp. 2,063 hits are detected within 1,094 samples, means:
-1) Multiple prophages (most common)
+4,126 sequences were left. (Orginal: 45387). More than one stx2 genes detected in some of the isolates, and some are at eact locus, this could because database redundancy: stx2 is highly variable, so the database include ref sequences of slightly different sequences, from different strains,from different studies. Database = many known versions of the same gene
+<img width="785" height="285" alt="image" src="https://github.com/user-attachments/assets/ed712348-5ede-4f89-8445-bb3dc02ff2e7" />
 
-The genes for stx2 live on lambdoid bacteriophages. A single E. coli isolate can carry more than one phage, each with its own stx2.
 
-Example in one genome:
-stx2a (phage 1)
-stx2c (phage 2)
-2) Different subtypes in the same strain
+## deduplicate by locus
+```
+awk '
+BEGIN {RS=">"; FS="\n"}
+NR>1 {
+    header=$1
+    seq=""
 
-You might see:
+    for(i=2;i<=NF;i++) seq=seq $i
 
-stx2a
-stx2c
+    # extract unique locus key
+    match(header, /(NODE_[^:]+:[0-9]+\.\.[0-9]+)/, c)
+    locus=c[1]
 
-in one sample.
-3) Assembly/contig effects
+    split(header, arr, "|")
+    sample=arr[1]
 
-Because phages can be repetitive:
+    key = sample "|" locus
 
-assemblies may split them across contigs
-VirulenceFinder can report multiple hits for the same gene region
+    if (!(key in seen)) {
+        seen[key]=1
+        print ">" header
+        print seq
+    }
+}
+' stx2_analysis/stx2_filtered.fasta > stx2_analysis/stx2_unique.fasta
+```
 
-👉 You may see:
 
-same subtype repeated
-slightly different coordinates
-## 
+## Extract useful info from original header
+```
+awk '
+BEGIN {RS=">"; FS="\n"}
+NR>1 {
+    header=$1
+    seq=""
+    for(i=2;i<=NF;i++) seq=seq $i
+
+    # ---- keep reference unchanged ----
+    if (header ~ /^REF_stx2A/) {
+        print ">" header
+        print seq
+        next
+    }
+
+    # ---- parse sample from header ----
+    split(header, arr, "|")
+    sample=arr[1]
+
+    # ---- subtype (stx2, stx2a, stx2c, ...) ----
+    subtype="stx2"
+    if (match(header, /(stx2[a-z]?)/, m)) {
+        subtype=m[1]
+    }
+
+    # ---- locus (contig + coordinates) ----
+    # try NODE_... first; fallback to any contig:pos..pos pattern
+    coord="NA"
+    if (match(header, /(NODE_[^:]+:[0-9]+\.\.[0-9]+)/, c)) {
+        coord=c[1]
+    } else if (match(header, /([^|]+:[0-9]+\.\.[0-9]+)/, c2)) {
+        coord=c2[1]
+    }
+
+    print ">" sample "|" subtype "|" coord
+    print seq
+}
+' stx2_analysis/stx2_with_ref_aligned.fasta > stx2_analysis/stx2_with_ref_labeled.fasta
+
+```
+## Mafft Alignment
+```
+mafft --auto stx2_analysis/stx2_with_ref_labeled.fasta > stx2_analysis/stx2_with_ref_aligned.fasta
+```
+## Add STECT/EHEC in the alignment Header
+```
+awk '
+BEGIN {
+    RS=">"; FS="\n"
+
+    # load sample → class mapping
+    while ((getline < "sample_info.tsv") > 0) {
+        class_map[$1] = $2
+    }
+}
+NR>1 {
+    header=$1
+    seq=""
+
+    for(i=2;i<=NF;i++) seq=seq $i
+
+    # ---- keep reference unchanged ----
+    if (header ~ /^REF_stx2A/) {
+        print ">" header
+        print seq
+        next
+    }
+
+    # ---- extract sample ----
+    split(header, arr, "|")
+    sample=arr[1]
+
+    # ---- get STEC/EHEC ----
+    class = (sample in class_map) ? class_map[sample] : "NA"
+
+    # ---- rebuild header ----
+    # keep original info, just insert class after sample
+    rest = substr(header, length(sample)+2)
+
+    print ">" sample "|" class "|" rest
+    print seq
+}
+' stx2_analysis/stx2_with_ref_aligned.fasta > stx2_analysis/stx2_final_annotated.fasta
+```
