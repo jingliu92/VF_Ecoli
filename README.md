@@ -86,7 +86,7 @@ END {
 }
 ' stx2_analysis/stx2_all.fasta > stx2_analysis/stx2_filtered.fasta
 ```
-4,126 sequences were left. (Orginal: 45387). More than one stx2 genes detected in some of the isolates, and some are at eact locus, this could because database redundancy: stx2 is highly variable, so the database include ref sequences of slightly different sequences, from different strains,from different studies. Database = many known versions of the same gene
+2063 sequences were left. (Orginal: 2063). More than one stx2 genes detected in some of the isolates, and some are at eact locus, this could because database redundancy: stx2 is highly variable, so the database include ref sequences of slightly different sequences, from different strains,from different studies. Database = many known versions of the same gene
 <img width="785" height="285" alt="image" src="https://github.com/user-attachments/assets/ed712348-5ede-4f89-8445-bb3dc02ff2e7" />
 
 
@@ -117,90 +117,74 @@ NR>1 {
 }
 ' stx2_analysis/stx2_filtered.fasta > stx2_analysis/stx2_unique.fasta
 ```
+```
+ grep -c ">" stx2_unique.fasta
+```
+875 sequences left, Meaning some isolates do have multiple stx2.
 
-
-## Extract useful info from original header
+## Include stx2 A reference sequence
+```
+cat stx2A_ref.fasta stx2_unique.fasta > stx2_with_ref.fasta
+```
+## Extract useful info from original header Add STECT/EHEC in the Header
 ```
 awk '
-BEGIN {RS=">"; FS="\n"}
-NR>1 {
+# ---- load mapping FIRST ----
+FNR==NR {
+    if (NR==1) next
+    class_map[$1] = $2
+    next
+}
+
+# ---- switch to FASTA mode AFTER loading ----
+FNR==1 {
+    RS=">"; FS="\n"
+}
+
+{
+    if ($0 == "") next
+
     header=$1
     seq=""
+
     for(i=2;i<=NF;i++) seq=seq $i
 
-    # ---- keep reference unchanged ----
-    if (header ~ /^REF_stx2A/) {
-        print ">" header
+    # ---- handle reference ----
+    if (header ~ /^stx2A/ || header ~ /^REF/) {
+        print ">REF_stx2A"
         print seq
         next
     }
 
-    # ---- parse sample from header ----
     split(header, arr, "|")
     sample=arr[1]
 
-    # ---- subtype (stx2, stx2a, stx2c, ...) ----
+    class = (sample in class_map) ? class_map[sample] : "NA"
+
+    # subtype
     subtype="stx2"
     if (match(header, /(stx2[a-z]?)/, m)) {
         subtype=m[1]
     }
 
-    # ---- locus (contig + coordinates) ----
-    # try NODE_... first; fallback to any contig:pos..pos pattern
-    coord="NA"
+    # locus
+    locus="NA"
     if (match(header, /(NODE_[^:]+:[0-9]+\.\.[0-9]+)/, c)) {
-        coord=c[1]
-    } else if (match(header, /([^|]+:[0-9]+\.\.[0-9]+)/, c2)) {
-        coord=c2[1]
+        locus=c[1]
     }
 
-    print ">" sample "|" subtype "|" coord
+    print ">" sample "|" class "|" subtype "|" locus
     print seq
 }
-' stx2_analysis/stx2_with_ref_aligned.fasta > stx2_analysis/stx2_with_ref_labeled.fasta
+' sample_info.tsv stx2_analysis/stx2_with_ref.fasta > stx2_analysis/stx2_annotated.fasta
 
 ```
+
+```
+sed 's/\.contigs//g' stx2_analysis/stx2_annotated.fasta > stx2_analysis/stx2_final.fasta
+```
+
 ## Mafft Alignment
 ```
-mafft --auto stx2_analysis/stx2_with_ref_labeled.fasta > stx2_analysis/stx2_with_ref_aligned.fasta
-```
-## Add STECT/EHEC in the alignment Header
-```
-awk '
-BEGIN {
-    RS=">"; FS="\n"
-
-    # load sample → class mapping
-    while ((getline < "sample_info.tsv") > 0) {
-        class_map[$1] = $2
-    }
-}
-NR>1 {
-    header=$1
-    seq=""
-
-    for(i=2;i<=NF;i++) seq=seq $i
-
-    # ---- keep reference unchanged ----
-    if (header ~ /^REF_stx2A/) {
-        print ">" header
-        print seq
-        next
-    }
-
-    # ---- extract sample ----
-    split(header, arr, "|")
-    sample=arr[1]
-
-    # ---- get STEC/EHEC ----
-    class = (sample in class_map) ? class_map[sample] : "NA"
-
-    # ---- rebuild header ----
-    # keep original info, just insert class after sample
-    rest = substr(header, length(sample)+2)
-
-    print ">" sample "|" class "|" rest
-    print seq
-}
-' stx2_analysis/stx2_with_ref_aligned.fasta > stx2_analysis/stx2_final_annotated.fasta
+mafft --auto stx2_analysis/stx2_final.fasta > stx2_analysis/stx2_aligned.fasta
 ```
